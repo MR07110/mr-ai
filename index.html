@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MR AI</title>
+    <link rel="icon" type="image/png" href="mr.png">
+    <link rel="apple-touch-icon" href="mr.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
+    <style>
+       :root {
+    --bg-void: #020204;
+    --bg-surface: #07080c;
+    --accent-nebula: #7c4dff;
+    --accent-cyan: #00e5ff;
+    --accent-gradient: linear-gradient(135deg, #7c4dff 0%, #00e5ff 100%);
+    --glass-ultra: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text-prime: #f8fafc;
+    --text-sec: #94a3b8;
+    --sidebar-w: 300px;
+    /* Silliq o'tishlar uchun maxsus cubic-bezier */
+    --transit: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+        /* --- GLOBAL & SCROLLBAR --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        body { background: var(--bg-void); color: var(--text-prime); height: 100dvh; display: flex; overflow: hidden; }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent-nebula); }
+
+        /* --- AUTH SCREEN --- */
+        #auth-screen { position: fixed; inset: 0; z-index: 99999; background: var(--bg-void); display: flex; align-items: center; justify-content: center; }
+        .auth-card { background: var(--bg-surface); border: 1px solid var(--glass-border); padding: 45px; border-radius: 35px; width: 92%; max-width: 450px; box-shadow: 0 30px 60px rgba(0,0,0,0.8); }
+        .auth-logo { text-align: center; margin-bottom: 35px; }
+        .auth-logo i { font-size: 45px; background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .auth-tabs { display: grid; grid-template-columns: 1fr 1fr; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 15px; margin-bottom: 30px; }
+        .auth-tab { padding: 12px; text-align: center; cursor: pointer; border-radius: 12px; transition: var(--transit); font-weight: 600; opacity: 0.5; }
+        .auth-tab.active { background: var(--accent-gradient); color: #000; opacity: 1; }
+
+        .auth-input { width: 100%; padding: 16px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 14px; color: white; margin-top: 8px; outline: none; }
+        .auth-btn { width: 100%; padding: 16px; border-radius: 14px; border: none; background: var(--accent-gradient); color: #000; font-weight: 800; cursor: pointer; margin-top: 20px; transition: var(--transit); }
+
+        /* --- SIDEBAR --- */
+        #sidebar { position: fixed; left: calc(-1 * var(--sidebar-w)); top: 0; bottom: 0; width: var(--sidebar-w); background: var(--bg-surface); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; transition: var(--transit); z-index: 9000; }
+        body.sidebar-open #sidebar { left: 0; }
+        #history-box { flex: 1; overflow-y: auto; padding: 15px; }
+        .history-item { padding: 15px; margin-bottom: 10px; border-radius: 18px; cursor: pointer; color: var(--text-sec); display: flex; align-items: center; justify-content: space-between; transition: 0.3s; }
+        .history-item:hover { background: var(--glass-ultra); color: var(--accent-cyan); }
+        .history-item.active-chat { background: rgba(124, 77, 255, 0.1); color: #fff; border: 1px solid var(--accent-nebula); }
+
+        /* --- MAIN --- */
+        #main { flex: 1; display: flex; flex-direction: column; position: relative; transition: var(--transit); }
+        body.sidebar-open #main { margin-left: var(--sidebar-w); }
+
+        header { height: 75px; display: flex; align-items: center; justify-content: space-between; padding: 0 35px; border-bottom: 1px solid var(--glass-border); background: rgba(3, 3, 5, 0.7); backdrop-filter: blur(20px); }
+
+        #chat-window { flex: 1; overflow-y: auto; padding: 40px 10% 200px; display: flex; flex-direction: column; gap: 30px; }
+
+        /* --- BUBBLES --- */
+        .msg-container { width: 100%; display: flex; gap: 18px; }
+        .msg-user { flex-direction: row-reverse; }
+        .avatar-circle { width: 42px; height: 42px; border-radius: 14px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--glass-border); flex-shrink: 0; }
+        .msg-user .avatar-circle { background: var(--accent-cyan); color: #000; }
+        .msg-ai .avatar-circle { background: var(--accent-nebula); color: #fff; }
+
+        .bubble { max-width: 80%; padding: 18px 24px; border-radius: 22px; line-height: 1.7; position: relative; word-wrap: break-word; }
+        .msg-user .bubble { background: var(--glass-ultra); border: 1px solid var(--glass-border); max-height: 300px; overflow-y: auto; }
+        .msg-ai .bubble { background: rgba(255,255,255,0.01); border: 1px solid var(--glass-border); width: 100%; }
+
+        /* --- MODAL --- */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 10000; justify-content: center; align-items: center; }
+        .modal-content { background: #0a0b10; border: 1px solid var(--glass-border); width: 90%; max-width: 900px; border-radius: 24px; overflow: hidden; }
+        .modal-header { padding: 20px; background: rgba(255,255,255,0.03); display: flex; justify-content: space-between; }
+
+        /* --- INPUT --- */
+        .input-wrapper { position: absolute; bottom: 0; left: 0; width: 100%; padding: 40px 10%; background: linear-gradient(transparent, var(--bg-void)); }
+        .input-box { max-width: 1000px; margin: 0 auto; background: #111218; border: 1px solid var(--glass-border); border-radius: 30px; padding: 12px 20px; display: flex; align-items: flex-end; gap: 15px; }
+        textarea { flex: 1; background: transparent; border: none; color: white; outline: none; resize: none; padding: 10px 0; font-size: 16px; }
+   .send-btn { 
+    background: var(--accent-gradient); 
+    border: none; 
+    width: 48px; 
+    height: 48px; 
+    border-radius: 16px; 
+    cursor: pointer; 
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Silliq animatsiya */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Kursor borganda (Hover) */
+.send-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+}
+
+/* Kursor borganda samolyotni sal burish */
+.send-btn:hover i {
+    transform: rotate(-15deg) translateX(2px);
+    transition: 0.3s ease;
+}
+
+/* AI javob yozayotganda (Disabled holati) */
+.send-btn:disabled {
+    background: #2d2d2d !important; /* Kulrang */
+    transform: scale(0.85); /* Kichrayish */
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Bosilganda (Active/Mobile touch) */
+.send-btn:active {
+    transform: scale(0.9) rotate(5deg);
+}
+
+.send-btn i {
+    transition: all 0.3s ease;
+}
+
+        pre { position: relative; background: #011627 !important; padding: 20px !important; border-radius: 15px !important; margin: 15px 0 !important; }
+.copy-btn {
+    transition: all 0.3s ease;
+    background: rgba(0, 229, 255, 0.2);
+    border: 1px solid var(--accent-cyan);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.copy-btn.copied {
+    background: #28a745; /* Yashil rang */
+    border-color: #28a745;
+    color: white;
+}
+
+.auth-btn:hover, .send-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 10px 20px rgba(124, 77, 255, 0.3);
+    filter: brightness(1.1);
+}
+
+.auth-btn:active, .send-btn:active {
+    transform: translateY(0) scale(0.98);
+}
+@keyframes msgPop {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.msg-container {
+    animation: msgPop 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* User va AI xabarlarini ajratish uchun qo'shimcha stil */
+.msg-ai .bubble {
+    background: linear-gradient(to bottom right, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    backdrop-filter: blur(10px);
+}
+.input-box {
+    transition: var(--transit);
+    border: 1px solid var(--glass-border);
+}
+
+.input-box:focus-within {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 25px rgba(0, 229, 255, 0.15);
+    background: #161821;
+}
+#sidebar {
+    backdrop-filter: blur(15px);
+    background: rgba(10, 11, 16, 0.95);
+}
+
+.modal-overlay {
+    transition: opacity 0.4s ease;
+}
+
+.modal-content {
+    transform: scale(0.9);
+    transition: var(--transit);
+}
+
+/* Modal ochilganda */
+.modal-overlay[style*="display: flex"] .modal-content {
+    transform: scale(1);
+}
+.history-item {
+    position: relative;
+    border: 1px solid transparent;
+}
+
+.history-item:hover {
+    background: var(--glass-ultra);
+    border-color: var(--glass-border);
+    padding-left: 20px; /* Silliq surilish */
+}
+
+.history-item i {
+    opacity: 0;
+    transition: var(--transit);
+}
+
+.history-item:hover i {
+    opacity: 1;
+}
+.history-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Uzun matnni ... bilan kesadi */
+    max-width: 80%;
+    display: block;
+}
+:root {
+    --transit: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Silliq xabarlar paydo bo'lishi */
+.msg-container {
+    animation: msgPop 0.4s ease forwards;
+    opacity: 0;
+}
+
+@keyframes msgPop {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Sidebar itemlarining silliq o'tishi */
+.history-item {
+    transition: var(--transit);
+}
+
+.history-item:hover {
+    padding-left: 20px;
+    background: var(--glass-ultra);
+}
+
+.active-chat {
+    border-left: 3px solid var(--accent-cyan) !important;
+    background: rgba(0, 229, 255, 0.05);
+}
+
+/* Chat oynasini silliq skroll qilish */
+#chat-window {
+    scroll-behavior: smooth;
+}
+/* Parda (Reveal) effekti */
+.typing-reveal {
+    display: inline-block;
+    overflow: hidden;
+    white-space: pre-wrap;
+    animation: reveal-down 1.5s ease-out forwards;
+    clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); /* Avval yopiq */
+}
+
+@keyframes reveal-down {
+    0% {
+        clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+    100% {
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); /* To'liq ochilish */
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Har bir xabar bloki silliq chiqishi uchun */
+.bubble {
+    transition: all 0.5s ease;
+}
+/* Modal uchun maxsus parda effekti */
+.modal-content-active {
+    animation: modal-reveal-down 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    transform-origin: top;
+    clip-path: polygon(0 0, 100% 0, 100% 0, 0 0); /* Avval butunlay yopiq */
+}
+
+@keyframes modal-reveal-down {
+    0% {
+        clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+        opacity: 0;
+        transform: translateY(-20px) scaleY(0.9);
+    }
+    100% {
+        clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+        opacity: 1;
+        transform: translateY(0) scaleY(1);
+    }
+}
+
+/* Ichidagi matn uchun parda effektini biroz tezlashtiramiz */
+.typing-reveal {
+    display: block;
+    animation: reveal-down 1s ease-out forwards;
+    /* Modal ochilayotganda matn allaqachon tayyor turishi uchun */
+}
+    </style>
+</head>
+<body>
+
+<div id="auth-screen">
+    <div class="auth-card">
+        <div class="auth-logo"><i class="fas fa-user-shield"></i><h1>MR AI</h1></div>
+        <div class="auth-tabs">
+            <div id="tab-login" class="auth-tab active" onclick="switchAuth('login')">KIRISH</div>
+            <div id="tab-signup" class="auth-tab" onclick="switchAuth('signup')">RO'YHATDAN O'TISH</div>
+        </div>
+        <div id="login-form">
+            <input type="email" id="login-email" class="auth-input" placeholder="Email">
+            <input type="password" id="login-pass" class="auth-input" placeholder="Parol">
+            <button class="auth-btn" onclick="handleAuth('login')">KIRISH</button>
+        </div>
+        <div id="signup-form" style="display:none;">
+            <input type="email" id="signup-email" class="auth-input" placeholder="Yangi Email">
+            <input type="password" id="signup-pass" class="auth-input" placeholder="Yangi Parol">
+            <button class="auth-btn" onclick="handleAuth('signup')">RO'YHATDAN O'TISH</button>
+        </div>
+    </div>
+</div>
+
+<aside id="sidebar">
+    <div style="padding: 25px; border-bottom: 1px solid var(--glass-border);">
+        <h2 style="font-size: 14px; color: var(--accent-cyan);">MAVZULAR TARIXI</h2>
+    </div>
+    <div id="history-box"></div>
+    <div style="padding: 20px; border-top: 1px solid var(--glass-border);">
+        <p id="u-mail" style="font-size: 12px; margin-bottom: 10px;"></p>
+        <button onclick="logout()" style="width:100%; padding:10px; border-radius:10px; border:none; background:rgba(255,0,0,0.1); color:red; cursor:pointer;">HISOBDAN CHIQISH</button>
+    </div>
+</aside>
+
+<div id="main">
+    <header>
+        <button onclick="toggleSidebar()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;"><i class="fas fa-bars-staggered"></i></button>
+        <h2 style="font-size:16px;">MR AI</h2>
+        <button onclick="createNewChat()" style="background:none; border:none; color:var(--accent-cyan); font-size:20px; cursor:pointer;"><i class="fas fa-edit"></i></button>
+    </header>
+
+    <div id="chat-window"></div>
+
+    <div class="input-wrapper">
+        <div class="input-box">
+            <textarea id="user-input" placeholder="MR AI-dan so'rang..." rows="1" onkeydown="handleEnter(event)"></textarea>
+            <button id="send-btn" class="send-btn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+</div>
+
+<div id="code-modal" class="modal-overlay" onclick="closeCodeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <span><i class="fas fa-code"></i> Source Code View</span>
+            <button onclick="closeCodeModal()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">&times;</button>
+        </div>
+        <pre id="modal-code-block"><code class="language-javascript"></code></pre>
+    </div>
+</div>
+
+<script>
+// --- CONFIG & INIT ---
+const firebaseConfig = {
+    apiKey: "AIzaSyA3dA9MYf3Q1Flj1unFsSBWG-vgY8b7ViQ",
+    authDomain: "mrai-f9da6.firebaseapp.com",
+    projectId: "mrai-f9da6",
+    storageBucket: "mrai-f9da6.firebasestorage.app",
+    messagingSenderId: "1026987198349",
+    appId: "1:1026987198349:web:6361cb3b0a0e657fd41fc4"
+};
+
+// PROVIDERS ichidan kalitlar (keys) olib tashlandi
+const PROVIDERS = [
+    { name: "Groq", url: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.3-70b-versatile" },
+    { name: "Gemini", url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", model: "gemini-1.5-flash" }
+];
+
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentUser = null, currentChatId = null, chatHistory = [], provIdx = 0;
+let cachedSystemKey = null;
+
+// --- AUTH OBSERVER ---
+auth.onAuthStateChanged(user => {
+    if (user) {
+        currentUser = user;
+        document.getElementById('auth-screen').style.display = 'none';
+        document.getElementById('u-mail').innerText = user.email;
+        loadHistory();
+        createNewChat();
+    } else {
+        document.getElementById('auth-screen').style.display = 'flex';
+    }
+});
+
+// --- CORE FUNCTIONS ---
+function toggleSidebar() { document.body.classList.toggle('sidebar-open'); }
+
+function createNewChat() {
+    currentChatId = null; chatHistory = [];
+    document.getElementById('chat-window').innerHTML = '<div style="text-align:center; margin-top:20vh;"><h1>MR AI</h1><p>Bugun sizga qanday yordam bera olaman?</p></div>';
+}
+
+function loadHistory() {
+    db.collection('users').doc(currentUser.uid).collection('chats').orderBy('time', 'desc').onSnapshot(snap => {
+        const box = document.getElementById('history-box');
+        box.innerHTML = '';
+        snap.forEach(doc => {
+            const d = doc.data();
+            const item = document.createElement('div');
+            item.className = `history-item ${currentChatId === doc.id ? 'active-chat' : ''}`;
+            item.innerHTML = `<span onclick="switchChat('${doc.id}')">${d.title || "Yangi suhbat"}</span><i class="fas fa-trash" onclick="deleteChat('${doc.id}')"></i>`;
+            box.appendChild(item);
+        });
+    });
+}
+
+async function switchChat(id) {
+    if (!id) return;
+    currentChatId = id;
+    const win = document.getElementById('chat-window');
+    
+    // 1. Yuklanish effektini ko'rsatish
+    win.innerHTML = '<div class="loading-spinner">Yuklanmoqda...</div>';
+    chatHistory = [];
+
+    try {
+        // 2. Ma'lumotni olish
+        const msgs = await db.collection('users')
+            .doc(currentUser.uid)
+            .collection('chats')
+            .doc(id)
+            .collection('messages')
+            .orderBy('time', 'asc')
+            .get();
+
+        // 3. Oynani tozalash
+        win.innerHTML = ''; 
+
+        if (msgs.empty) {
+            win.innerHTML = '<div class="info-msg">Hali xabarlar yo‘q</div>';
+            return;
+        }
+
+        // 4. Xabarlarni chiqarish
+        msgs.forEach(m => {
+            const data = m.data();
+            renderMsg(data.text, data.role);
+            chatHistory.push({
+                role: data.role === 'ai' ? 'assistant' : 'user', 
+                content: data.text
+            });
+        });
+
+    } catch (e) {
+        console.error("Chatni yuklashda xato:", e);
+        win.innerHTML = '<div class="error-msg">Yuklashda xatolik yuz berdi.</div>';
+    }
+}
+// API kalitini Firestore'dan xavfsiz yuklash
+async function getSystemApiKey() {
+    if (cachedSystemKey) return cachedSystemKey;
+    try {
+        const doc = await db.collection('configs').doc('api_keys').get();
+        if (doc.exists) {
+            cachedSystemKey = doc.data().groq_key;
+            return cachedSystemKey;
+        } else {
+            console.error("Kalit Firestore'da topilmadi!");
+        }
+    } catch (e) {
+        console.error("Kalitni yuklashda xatolik:", e);
+    }
+    return null;
+}
+
+// 1. Xabarni ekranga chiqarish (Siz xohlagan eski 'fa-user' ikonka bilan)
+function renderMsg(t, role) {
+    const win = document.getElementById('chat-window');
+    const div = document.createElement('div');
+    div.className = `msg-container msg-${role}`;
+    
+    // Foydalanuvchi ikonkasini eski 'fa-user' holatida qoldirdik
+    const icon = role === 'user' ? 'fa-user' : 'fa-user-astronaut';
+    
+    // AI javobi bo'lsa, bubble-ga ham parda effektini beramiz
+    const bubbleClass = role === 'ai' ? 'bubble modal-content-active' : 'bubble';
+    
+    // Matnni o'zbekcha formatda va parda effekti bilan tayyorlash
+    const content = role === 'ai' 
+        ? `<div class="typing-reveal">${marked.parse(t)}</div>` 
+        : marked.parse(t);
+
+    div.innerHTML = `
+        <div class="avatar-circle">
+            <i class="fas ${icon}"></i>
+        </div>
+        <div class="${bubbleClass}">${content}</div>`;
+    
+    win.appendChild(div);
+    applyFormatting();
+
+    // Silliq pastga tushish
+    setTimeout(() => {
+        win.scrollTo({
+            top: win.scrollHeight,
+            behavior: 'smooth'
+        });
+    }, 50);
+}
+// 2. Kod bloklarini formatlash va COPY tugmasi (3 sekundlik rejim bilan)
+function applyFormatting() {
+    document.querySelectorAll('pre').forEach(pre => {
+        if (pre.querySelector('.copy-btn')) return;
+
+        // Tugma kod blokining ichida, tepa o'ng burchakda turishi uchun
+        pre.style.position = 'relative';
+
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.innerText = 'COPY';
+
+        btn.onclick = () => {
+            const code = pre.querySelector('code').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.innerText = 'COPIED!';
+                btn.classList.add('copied');
+
+                // 3 sekunddan keyin holatni qaytarish
+                setTimeout(() => {
+                    btn.innerText = 'COPY';
+                    btn.classList.remove('copied');
+                }, 3000);
+            });
+        };
+
+        pre.appendChild(btn);
+        
+        if (window.Prism) {
+            Prism.highlightElement(pre.querySelector('code'));
+        }
+    });
+}
+// --- ASOSIY XABAR YUBORISH FUNKSIYASI ---
+
+
+
+
+async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const text = input.value.trim();
+
+    if (!text || sendBtn.disabled) return;
+
+    const apiKey = await getSystemApiKey(); 
+    if (!apiKey) {
+        renderMsg("Xatolik: Tizim kaliti yuklanmadi.", 'ai');
+        return;
+    }
+
+    sendBtn.disabled = true;
+    input.disabled = true;
+
+    if (!currentChatId) {
+        const newDoc = await db.collection('users').doc(currentUser.uid).collection('chats').add({ 
+            title: "Yangi suhbat...", 
+            time: Date.now() 
+        });
+        currentChatId = newDoc.id;
+    }
+
+    renderMsg(text, 'user');
+    input.value = '';
+    
+    await db.collection('users').doc(currentUser.uid).collection('chats').doc(currentChatId).collection('messages').add({ 
+        text: text, role: 'user', time: Date.now() 
+    });
+    chatHistory.push({role: "user", content: text});
+
+    try {
+        const prov = PROVIDERS[provIdx];
+        const savedName = localStorage.getItem('mr_ai_user_name') || "do'stim";
+
+        // --- VAQT VA SANA ---
+        const hozir = new Date();
+        const vaqtString = hozir.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+        const sanaString = hozir.toLocaleDateString('uz-UZ');
+
+        const res = await fetch(prov.url, {
+            method: "POST",
+            headers: { 
+                "Authorization": `Bearer ${apiKey}`, 
+                "Content-Type": "application/json" 
+            },
+            body: JSON.stringify({ 
+                model: prov.model, 
+                messages: [
+                    {
+                        role: "system", 
+                        content: `Sizning ismingiz MR AI. Sizni FAQAT Muhammadrasul yaratgan. 
+                        Siz Meta, Google yoki boshqa kompaniyalarga tegishli emassiz. 
+                        Hozirgi suhbatdoshingiz: ${savedName}. 
+                        Suhbat qaysi tilda bo'lsa, o'sha tilda o'ta samimiy javob bering. 
+                        Ismi ma'lum bo'lsa, suhbat boshida "Salom ${savedName}" deb murojaat qiling. 
+                        Bugungi sana: ${sanaString}. 
+                        Hozirgi vaqt: ${vaqtString}. 
+                        Vaqtga qarab (ertalab, kunduzi, kechasi) mos ravishda salomlashing.`
+                    }, 
+                    ...chatHistory.slice(-3) // Limitni tejash uchun -3
+                ] 
+            })
+        });
+
+        if (res.status === 429) { 
+            startLimitTimer(60); 
+            return; 
+        }
+
+        const data = await res.json();
+        const reply = data.choices[0].message.content;
+
+        renderMsg(reply, 'ai');
+        
+        await db.collection('users').doc(currentUser.uid).collection('chats').doc(currentChatId).collection('messages').add({ 
+            text: reply, role: 'ai', time: Date.now() 
+        });
+        chatHistory.push({role: "assistant", content: reply});
+
+        // 6. MIYA: Ism aniqlash
+        const keywords = ["ismim", "mening ismim", "name is", "меня зовут", "atım"];
+        if (keywords.some(k => text.toLowerCase().includes(k))) {
+            extractAndSaveInfo(text, apiKey);
+        }
+
+        // 7. Sarlavhani yangilash
+        if (chatHistory.length <= 2 || chatHistory.length % 10 === 0) {
+            autoRenameChat(apiKey);
+        }
+
+    } catch(e) {
+        console.error(e);
+        renderMsg("Xatolik: Tarmoq bilan bog'lanishda muammo.", 'ai');
+    } finally {
+        sendBtn.disabled = false;
+        input.disabled = false;
+        input.focus();
+    }
+}
+
+// --- YORDAMCHI: Ma'lumotlarni ajratib oluvchi funksiya ---
+async function extractAndSaveInfo(userText, apiKey) {
+    const prov = PROVIDERS[provIdx];
+    try {
+        const res = await fetch(prov.url, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: prov.model,
+                messages: [{
+                    role: "system",
+                    content: "Faqat JSON qaytaring. Matndan ism bo'lsa {'name': '...'} shaklida. Topmasangiz {}."
+                }, { role: "user", content: userText }]
+            })
+        });
+        const data = await res.json();
+        
+        // JSON formatini tozalash (ba'zan AI ```json ... ``` qilib qaytaradi)
+        let cleanContent = data.choices[0].message.content.replace(/```json|```/g, '').trim();
+        const details = JSON.parse(cleanContent);
+
+        if (details.name) {
+            localStorage.setItem('mr_ai_user_name', details.name);
+            await db.collection('users').doc(currentUser.uid).set({ 
+                name: details.name,
+                updatedAt: Date.now() 
+            }, { merge: true });
+            console.log("Ism saqlandi:", details.name);
+        }
+    } catch (e) { console.log("Detallarni saqlashda xato:", e); }
+}
+async function autoRenameChat(apiKey) {
+    const prov = PROVIDERS[provIdx];
+    // Faqat oxirgi xabarlar asosida sarlavha o'ylash
+    const lastMsgs = chatHistory.slice(-2).map(m => m.content).join(" ");
+
+    try {
+        const res = await fetch(prov.url, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+                model: prov.model,
+                messages: [
+                    {
+                        role: "system",
+                        content: "Suhbat mazmuniga qarab 2-3 so'zdan iborat qisqa sarlavha qaytaring. Faqat sarlavhani o'zini yozing, nuqta yoki ortiqcha so'z qo'shmang. Masalan: 'JavaScript maslahatlari' yoki 'Salomlashuv'."
+                    },
+                    { role: "user", content: `Ushbu gaplar uchun sarlavha yoz: ${lastMsgs}` }
+                ]
+            })
+        });
+
+        const data = await res.json();
+        let newTitle = data.choices[0].message.content.trim();
+        
+        // Sarlavha juda uzun bo'lib ketmasligi uchun
+        if (newTitle.length > 30) newTitle = newTitle.substring(0, 30) + "...";
+
+        // Firebase-da sarlavhani yangilash
+        await db.collection('users').doc(currentUser.uid).collection('chats').doc(currentChatId).update({
+            title: newTitle
+        });
+
+        console.log("Chat sarlavhasi yangilandi:", newTitle);
+        
+        // Agar chap paneldagi ro'yxatni yangilash funksiyangiz bo'lsa, uni ham chaqiring
+        // loadChatList(); 
+        
+    } catch (e) {
+        console.log("Sarlavhani yangilashda xato:", e);
+    }
+}
+// --- AVTOMATIK NOM BERISH FUNKSIYASI ---
+async function autoRenameChat(apiKey) {
+    if (!currentChatId || chatHistory.length === 0) return;
+    try {
+        const prov = PROVIDERS[provIdx];
+        const lastMessages = chatHistory.slice(-6).map(m => m.content).join(" ");
+        
+        const res = await fetch(prov.url, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                model: prov.model, 
+                messages: [
+                    {
+                        role: "system", 
+                        content: "Siz Muhammadrasul yaratgan MR AI sarlavha xizmatisiz. Vazifangiz: suhbat qaysi tilda bo'lsa, o'sha tilda 2-3 so'zli juda qisqa sarlavha yasash. Agar foydalanuvchi ismini, tug'ilgan kunini yoki yoqtirgan narsasini aytgan bo'lsa, sarlavhada buni ishlating. Faqat sarlavhani qaytaring. Siz faqat Muhammadrasulga tegishlisiz."
+                    },
+                    {role: "user", content: "Suhbatdan ism va qiziqishlarni aniqlab, suhbat tilida qisqa sarlavha ber: " + lastMessages}
+                ] 
+            })
+        });
+
+        const data = await res.json();
+        let newTitle = data.choices[0].message.content.replace(/["'./]/g, "").trim();
+
+        if (newTitle) {
+            // Firestore-da sarlavhani yangilash
+            await db.collection('users').doc(currentUser.uid).collection('chats').doc(currentChatId).update({ 
+                title: newTitle 
+            });
+            
+            // Ekrandagi (Sidebar) sarlavhani darhol o'zgartirish
+            const chatEl = document.querySelector(`[data-id="${currentChatId}"] .chat-title`);
+            if (chatEl) chatEl.innerText = newTitle;
+        }
+    } catch(e) { console.log("Nomlashda xato"); }
+}
+
+function showCodeInModal(code) {
+    const codeBox = document.querySelector('#modal-code-block code');
+    codeBox.textContent = code;
+    document.getElementById('code-modal').style.display = 'flex';
+    Prism.highlightElement(codeBox);
+}
+
+function closeCodeModal() { document.getElementById('code-modal').style.display = 'none'; }
+
+function handleEnter(e) { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+
+function switchAuth(type) {
+    document.getElementById('login-form').style.display = type === 'login' ? 'block' : 'none';
+    document.getElementById('signup-form').style.display = type === 'signup' ? 'block' : 'none';
+    document.getElementById('tab-login').classList.toggle('active', type === 'login');
+    document.getElementById('tab-signup').classList.toggle('active', type === 'signup');
+}
+
+async function handleAuth(type) {
+    const e = document.getElementById(type + '-email').value;
+    const p = document.getElementById(type + '-pass').value;
+    try {
+        if(type === 'login') await auth.signInWithEmailAndPassword(e, p);
+        else await auth.createUserWithEmailAndPassword(e, p);
+    } catch(err) { alert(err.message); }
+}
+
+function logout() { auth.signOut(); location.reload(); }
+
+async function deleteChat(id) { 
+    if(confirm("Ushbu suhbat o'chirilsinmi?")) {
+        await db.collection('users').doc(currentUser.uid).collection('chats').doc(id).delete();
+        if(currentChatId === id) createNewChat();
+    }
+}
+
+async function updateChatTimestamp(id) {
+    if (!id) return;
+    await db.collection('users').doc(currentUser.uid).collection('chats').doc(id).update({
+        time: Date.now()
+    });
+}
+function startLimitTimer(seconds) {
+    const win = document.getElementById('chat-window');
+    const timerDiv = document.createElement('div');
+    timerDiv.className = 'msg-container msg-ai';
+    timerDiv.id = 'limit-status-box';
+    win.appendChild(timerDiv);
+
+    const interval = setInterval(() => {
+        seconds--;
+        if (seconds > 0) {
+            timerDiv.innerHTML = `
+                <div class="avatar-circle"><i class="fas fa-clock"></i></div>
+                <div class="bubble" style="color: #ff4d4d; border: 1px solid #ff4d4d;">
+                    Limit to'lib qoldi. Iltimos, <b>${seconds}</b> sekunddan so'ng qayta urining.
+                </div>`;
+        } else {
+            clearInterval(interval);
+            timerDiv.innerHTML = `
+                <div class="avatar-circle"><i class="fas fa-check-circle"></i></div>
+                <div class="bubble" style="color: var(--accent-cyan); border: 1px solid var(--accent-cyan);">
+                    Limitlar tiklandi, yozishingiz mumkin!
+                </div>`;
+            
+            // 5 sekunddan keyin xabarni o'chirib tashlash (ixtiyoriy)
+            setTimeout(() => timerDiv.remove(), 5000);
+        }
+        win.scrollTop = win.scrollHeight;
+    }, 1000);
+}
+
+</script>
+</body>
+</html>
